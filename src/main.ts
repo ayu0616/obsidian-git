@@ -1130,29 +1130,24 @@ export default class ObsidianGit extends Plugin {
             const mdFiles = changedFiles.filter((f) =>
                 f.vault_path.endsWith(".md")
             );
+            const processList: Promise<string>[] = [];
             for (const file of mdFiles) {
                 const fileObj = this.app.vault.getAbstractFileByPath(
                     file.vault_path
                 );
                 if (!(fileObj instanceof TFile)) continue;
 
-                const text = await this.app.vault.read(fileObj);
-                const newLines: string[] = [];
-                let isInYaml = false;
-                for (const line of text.split("\n")) {
-                    if (line.startsWith("---")) {
-                        isInYaml = !isInYaml;
-                    }
-                    if (isInYaml && line.startsWith("modified:")) {
-                        newLines.push(
-                            `modified: ${dayjs(new Date()).format("YYYY-MM-DD HH:mm")}`
-                        );
-                    } else {
-                        newLines.push(line);
-                    }
-                }
-                await this.app.vault.modify(fileObj, newLines.join("\n"));
+                const p = this.app.vault.process(fileObj, (data) => {
+                    return data.replace(
+                        /^modified: \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/m,
+                        `modified: ${dayjs(new Date()).format(
+                            "YYYY-MM-DD HH:mm"
+                        )}`
+                    );
+                });
+                processList.push(p);
             }
+            await Promise.all(processList);
 
             let committedFiles: number | undefined;
             if (onlyStaged) {
