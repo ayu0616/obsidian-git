@@ -121,13 +121,19 @@ export abstract class GitManager {
     // Constructs a path relative to the git repository from a path relative to the vault
     //
     // @param doConversion - If false, the path is returned as is. This is added because that parameter is often passed on to functions where this method is called.
-    getRelativeRepoPath(path: string, doConversion: boolean = true): string {
+    getRelativeRepoPath(
+        filePath: string,
+        doConversion: boolean = true
+    ): string {
         if (doConversion) {
             if (this.plugin.settings.basePath.length > 0) {
-                return path.substring(this.plugin.settings.basePath.length + 1);
+                //Expect the case that the git repository is located inside the vault on mobile platform currently.
+                return filePath.substring(
+                    this.plugin.settings.basePath.length + 1
+                );
             }
         }
-        return path;
+        return filePath;
     }
 
     private _getTreeStructure<T = DiffFile | FileStatusResult>(
@@ -251,20 +257,26 @@ export abstract class GitManager {
             status = status ?? (await this.status());
 
             const changeset: { [key: string]: string[] } = {};
-            status.staged.forEach((value: FileStatusResult) => {
-                if (value.index in changeset) {
-                    changeset[value.index].push(value.path);
-                } else {
-                    changeset[value.index] = [value.path];
+            let files = "";
+            // If there are more than 100 files, we don't list them all
+            if (status.staged.length < 100) {
+                status.staged.forEach((value: FileStatusResult) => {
+                    if (value.index in changeset) {
+                        changeset[value.index].push(value.path);
+                    } else {
+                        changeset[value.index] = [value.path];
+                    }
+                });
+
+                const chunks = [];
+                for (const [action, files] of Object.entries(changeset)) {
+                    chunks.push(action + " " + files.join(" "));
                 }
-            });
 
-            const chunks = [];
-            for (const [action, files] of Object.entries(changeset)) {
-                chunks.push(action + " " + files.join(" "));
+                files = chunks.join(", ");
+            } else {
+                files = "Too many files to list";
             }
-
-            const files = chunks.join(", ");
 
             template = template.replace("{{files}}", files);
         }
@@ -275,14 +287,15 @@ export abstract class GitManager {
             moment().format(this.plugin.settings.commitDateFormat)
         );
         if (this.plugin.settings.listChangedFilesInMessageBody) {
-            template =
-                template +
-                "\n\n" +
-                "Affected files:" +
-                "\n" +
-                (status ?? (await this.status())).staged
-                    .map((e) => e.path)
-                    .join("\n");
+            const status2 = status ?? (await this.status());
+            let files = "";
+            // If there are more than 100 files, we don't list them all
+            if (status2.staged.length < 100) {
+                files = status2.staged.map((e) => e.path).join("\n");
+            } else {
+                files = "Too many files to list";
+            }
+            template = template + "\n\n" + "Affected files:" + "\n" + files;
         }
         return template;
     }
