@@ -1,18 +1,18 @@
 import dayjs from "dayjs";
 import { Errors } from "isomorphic-git";
 import {
-    debounce,
     Debouncer,
     EventRef,
     MarkdownView,
     Menu,
-    normalizePath,
     Notice,
     Platform,
     Plugin,
     TAbstractFile,
     TFile,
     WorkspaceLeaf,
+    debounce,
+    normalizePath,
 } from "obsidian";
 import { LineAuthoringFeature } from "src/lineAuthor/lineAuthorIntegration";
 import { pluginRef } from "src/pluginGlobalRef";
@@ -35,11 +35,11 @@ import { LocalStorageSettings } from "./setting/localStorageSettings";
 import {
     DiffViewState,
     FileStatusResult,
-    mergeSettingsByPriority,
     ObsidianGitSettings,
     PluginState,
     Status,
     UnstagedFile,
+    mergeSettingsByPriority,
 } from "./types";
 import DiffView from "./ui/diff/diffView";
 import HistoryView from "./ui/history/historyView";
@@ -1138,11 +1138,18 @@ export default class ObsidianGit extends Plugin {
                 if (!(fileObj instanceof TFile)) continue;
 
                 const p = this.app.vault.process(fileObj, (data) => {
-                    return data.replace(
-                        /^modified: \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/m,
-                        `modified: ${dayjs(new Date()).format(
-                            "YYYY-MM-DD HH:mm"
-                        )}`
+                    return (
+                        data
+                            // .mdファイルのmodifiedを更新する
+                            .replace(
+                                /^modified: \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/m,
+                                `modified: ${dayjs(fileObj.stat.mtime).format("YYYY-MM-DD HH:mm")}`
+                            )
+                            // .mdファイルのcreatedを更新する
+                            .replace(
+                                /^created: \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/m,
+                                `created: ${dayjs(fileObj.stat.ctime).format("YYYY-MM-DD HH:mm")}`
+                            )
                     );
                 });
                 processList.push(p);
